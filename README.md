@@ -1,3 +1,4 @@
+@ -1,36 +0,0 @@
 # ScoutSense
 ScoutSense is a Python-powered sports analytics platform designed to simulate, predict, and visualize NFL draft strategies. Built by a passionate fan of football and data, this project bridges the gap between sports enthusiasm and technical innovation — empowering users to play GM, challenge expert mock drafts, and explore team-building philosophies through data.
 
