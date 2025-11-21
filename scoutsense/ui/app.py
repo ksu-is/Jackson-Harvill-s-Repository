@@ -10,6 +10,9 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import sys
+import os
+import glob
+import argparse
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -24,7 +27,7 @@ from utils.models import (
 class ScoutSenseApp:
     """Main Tkinter application for ScoutSense"""
     
-    def __init__(self, root):
+    def __init__(self, root, initial_data_path=None, auto_train=False):
         self.root = root
         self.root.title("ScoutSense - NFL Draft Prediction & Comparison")
         self.root.geometry("1000x700")
@@ -37,6 +40,19 @@ class ScoutSenseApp:
         
         # Setup UI
         self.setup_ui()
+        # Attempt to load initial data if provided
+        self._auto_train_on_startup = bool(auto_train)
+        if initial_data_path:
+            try:
+                self.load_data_from_path(initial_data_path)
+            except Exception:
+                # Don't block UI startup if initial load fails
+                pass
+            else:
+                # If auto-train requested, schedule training after mainloop starts
+                if self._auto_train_on_startup:
+                    # schedule shortly after startup so the UI initializes cleanly
+                    self.root.after(100, lambda: self.train_models())
         
     def setup_ui(self):
         """Setup the main UI layout"""
@@ -348,6 +364,21 @@ Getting Started:
                 messagebox.showinfo("Success", f"Data loaded successfully!\nRows: {len(self.df)}")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load data:\n{str(e)}")
+
+    def load_data_from_path(self, file_path):
+        """Load data from a given file path (used at startup)."""
+        if not file_path:
+            raise ValueError("No file path provided")
+        file_path = str(file_path)
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Data file not found: {file_path}")
+        # Use the same loading logic as the interactive loader
+        self.df = pd.read_csv(file_path)
+        self.status_label.config(
+            text=f"Loaded: {Path(file_path).name} ({len(self.df)} rows)",
+            foreground="green"
+        )
+        self.update_player_combos()
                 
     def train_models(self):
         """Train all models"""
@@ -510,8 +541,56 @@ Interpretation:
 
 def main():
     """Main entry point"""
+    # Parse optional CLI arg for startup data
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument('--data', help='Path to CSV file to load at startup', default=None)
+    # Boolean optional action is available in modern Python to allow --auto-train / --no-auto-train
+    try:
+        parser.add_argument('--auto-train', action=argparse.BooleanOptionalAction, default=None,
+                            help='Automatically train models at startup if data is loaded (env/CLI/auto-detected)')
+    except Exception:
+        # Fallback for older argparse implementations (shouldn't happen on Python 3.13)
+        parser.add_argument('--auto-train', dest='auto_train', action='store_true')
+        parser.add_argument('--no-auto-train', dest='auto_train', action='store_false')
+
+    args, _ = parser.parse_known_args()
+
+    # Determine startup data path: CLI -> ENV -> scoutsense/data/*.csv
+    startup_data = None
+    if args.data:
+        startup_data = args.data
+    else:
+        env_path = os.getenv('SCOUTSENSE_DATA')
+        if env_path:
+            startup_data = env_path
+        else:
+            # Look for CSVs in the package data directory
+            data_dir = Path(__file__).parent.parent / 'data'
+            if data_dir.exists() and data_dir.is_dir():
+                # Prefer a file named 'default_data.csv' if present
+                default_file = data_dir / 'default_data.csv'
+                if default_file.exists():
+                    startup_data = str(default_file)
+                else:
+                    csvs = sorted(glob.glob(str(data_dir / '*.csv')))
+                    if csvs:
+                        startup_data = csvs[0]
+
+    # Determine auto-train behavior: CLI -> ENV -> default True
+    auto_train = True
+    if getattr(args, 'auto_train', None) is not None:
+        auto_train = bool(args.auto_train)
+    else:
+        env_auto = os.getenv('SCOUTSENSE_AUTO_TRAIN')
+        if env_auto is not None:
+            env_auto = env_auto.strip().lower()
+            if env_auto in ('0', 'false', 'no'):
+                auto_train = False
+            else:
+                auto_train = True
+
     root = tk.Tk()
-    app = ScoutSenseApp(root)
+    app = ScoutSenseApp(root, initial_data_path=startup_data, auto_train=auto_train)
     root.mainloop()
 
 
