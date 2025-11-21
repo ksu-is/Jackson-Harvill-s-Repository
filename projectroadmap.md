@@ -85,3 +85,9 @@
 - Edit `projectroadmap.md` and submit a PR for changes.
 - For major updates, create a linked issue.
 - Review roadmap every 4–6 weeks to stay aligned.
+
+Tkinter UI Introduced
+Need to...
+-Clean up design
+-Auto pull CSV file
+-Automate ML
