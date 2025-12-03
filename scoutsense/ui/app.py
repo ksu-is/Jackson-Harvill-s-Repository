@@ -567,19 +567,24 @@ def main():
             # Look for CSVs in the package data directory
             data_dir = Path(__file__).parent.parent / 'data'
             if data_dir.exists() and data_dir.is_dir():
-                # Prefer 'nfl_draft_engineered.csv' if present
-                engineered_file = data_dir / 'nfl_draft_engineered.csv'
-                if engineered_file.exists():
-                    startup_data = str(engineered_file)
+                # Prefer 'nfl_draft_combined.csv' (comprehensive multi-year dataset) if present
+                combined_file = data_dir / 'nfl_draft_combined.csv'
+                if combined_file.exists():
+                    startup_data = str(combined_file)
                 else:
-                    # Fall back to 'default_data.csv' if present
-                    default_file = data_dir / 'default_data.csv'
-                    if default_file.exists():
-                        startup_data = str(default_file)
+                    # Fall back to 'nfl_draft_engineered.csv' if present
+                    engineered_file = data_dir / 'nfl_draft_engineered.csv'
+                    if engineered_file.exists():
+                        startup_data = str(engineered_file)
                     else:
-                        csvs = sorted(glob.glob(str(data_dir / '*.csv')))
-                        if csvs:
-                            startup_data = csvs[0]
+                        # Fall back to 'default_data.csv' if present
+                        default_file = data_dir / 'default_data.csv'
+                        if default_file.exists():
+                            startup_data = str(default_file)
+                        else:
+                            csvs = sorted(glob.glob(str(data_dir / '*.csv')))
+                            if csvs:
+                                startup_data = csvs[0]
 
     # Determine auto-train behavior: CLI -> ENV -> default True
     auto_train = True
