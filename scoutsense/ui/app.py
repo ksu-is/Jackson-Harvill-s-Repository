@@ -12,6 +12,20 @@ import sys
 import os
 import glob
 import argparse
+import threading
+import queue
+import time
+
+# Matplotlib (optional embedding) - used for Analytics charts
+try:
+    import matplotlib
+    from matplotlib.figure import Figure
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    MATPLOTLIB_AVAILABLE = True
+except Exception:
+    Figure = None
+    FigureCanvasTkAgg = None
+    MATPLOTLIB_AVAILABLE = False
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -21,6 +35,14 @@ from utils.models import (
     PlayerSuccessClassifier,
     PlayerComparison
 )
+
+# Try to use ttkbootstrap for a modern theme if available, otherwise fall back to ttk themes
+try:
+    import ttkbootstrap as ttkb
+    TB_AVAILABLE = True
+except Exception:
+    ttkb = None
+    TB_AVAILABLE = False
 
 
 class ScoutSenseApp:
@@ -39,6 +61,10 @@ class ScoutSenseApp:
         
         # Setup UI
         self.setup_ui()
+        # Background queue for cross-thread UI updates
+        self._bg_queue = queue.Queue()
+        # Start queue processor
+        self._process_queue()
         # Attempt to load initial data if provided
         self._auto_train_on_startup = bool(auto_train)
         if initial_data_path:
@@ -72,7 +98,28 @@ class ScoutSenseApp:
         self.notebook.add(self.tab_predictor, text="Draft Predictor")
         self.notebook.add(self.tab_comparison, text="Player Comparison")
         self.notebook.add(self.tab_analytics, text="Analytics")
-        
+
+        # Create a persistent bottom status bar with progress
+        status_bar = ttk.Frame(self.root)
+        status_bar.pack(side="bottom", fill="x")
+        self.bottom_status_var = tk.StringVar(value="Ready")
+        self.bottom_status_label = ttk.Label(status_bar, textvariable=self.bottom_status_var)
+        self.bottom_status_label.pack(side="left", padx=8, pady=4)
+        self.progress = ttk.Progressbar(status_bar, orient="horizontal", mode="determinate", maximum=100)
+        self.progress.pack(side="right", padx=8, pady=4)
+
+        # Apply theme if ttkbootstrap is available
+        if TB_AVAILABLE:
+            try:
+                ttkb.Style(theme="litera")
+            except Exception:
+                pass
+        else:
+            try:
+                ttk.Style().theme_use("clam")
+            except Exception:
+                pass
+
         # Setup each tab
         self.setup_home_tab()
         self.setup_predictor_tab()
@@ -247,7 +294,23 @@ Getting Started:
         results_frame = ttk.LabelFrame(frame, text="Analysis Results", padding="10")
         results_frame.pack(fill="both", expand=True, pady=10)
         
+        # Left: textual results
         self.analytics_results = self._create_results_text_widget(results_frame)
+
+        # Right: Matplotlib chart area (if available)
+        if MATPLOTLIB_AVAILABLE:
+            chart_frame = ttk.Frame(results_frame)
+            chart_frame.pack(fill="both", expand=True, pady=6)
+            # Create a Figure for plotting
+            self.chart_fig = Figure(figsize=(6, 3), dpi=100)
+            self.chart_ax = self.chart_fig.add_subplot(111)
+            self.chart_canvas = FigureCanvasTkAgg(self.chart_fig, master=chart_frame)
+            self.chart_canvas.get_tk_widget().pack(fill="both", expand=True)
+        else:
+            # If matplotlib isn't available, leave space but don't crash
+            self.chart_fig = None
+            self.chart_ax = None
+            self.chart_canvas = None
         
     def load_data(self):
         """Load data file"""
@@ -286,26 +349,65 @@ Getting Started:
         if self.df is None:
             messagebox.showwarning("Warning", "Please load data first")
             return
-            
+        # Run training in a background thread and update UI via queue
+        self._toggle_buttons(False)
+        self.progress['value'] = 0
+        self.bottom_status_var.set("Starting training...")
+        thread = threading.Thread(target=self._train_models_thread, daemon=True)
+        thread.start()
+
+    def _train_models_thread(self):
+        """Background worker that trains models and reports progress back to the main thread via queue."""
         try:
-            self._toggle_buttons(False)
-            self.root.update()
-            
-            # Train models
+            # Draft predictor
+            self._bg_queue.put(("status", "Training Draft Position Predictor..."))
             self.predictor = DraftPositionPredictor()
             self.predictor.train(self.df)
-            
+            self._bg_queue.put(("progress", 50))
+
+            # Success classifier
+            self._bg_queue.put(("status", "Training Player Success Classifier..."))
             self.classifier = PlayerSuccessClassifier(success_threshold=5)
             self.classifier.train(self.df)
-            
+            self._bg_queue.put(("progress", 85))
+
+            # Comparator (fast)
+            self._bg_queue.put(("status", "Building player comparator..."))
             self.comparator = PlayerComparison(self.df)
-            
-            messagebox.showinfo("Success", "Models trained successfully!")
-            
+            self._bg_queue.put(("progress", 95))
+
+            # Done
+            self._bg_queue.put(("progress", 100))
+            self._bg_queue.put(("done", "Models trained successfully!"))
         except Exception as e:
-            messagebox.showerror("Error", f"Training failed:\n{str(e)}")
+            self._bg_queue.put(("error", str(e)))
+
+    def _process_queue(self):
+        """Process UI update messages from background threads."""
+        try:
+            while not self._bg_queue.empty():
+                msg = self._bg_queue.get_nowait()
+                typ = msg[0]
+                if typ == "status":
+                    self.bottom_status_var.set(msg[1])
+                elif typ == "progress":
+                    try:
+                        self.progress['value'] = int(msg[1])
+                    except Exception:
+                        pass
+                elif typ == "done":
+                    self.bottom_status_var.set(msg[1])
+                    messagebox.showinfo("Success", msg[1])
+                    self._toggle_buttons(True)
+                elif typ == "error":
+                    self.bottom_status_var.set("Error")
+                    messagebox.showerror("Error", f"Training failed:\n{msg[1]}")
+                    self._toggle_buttons(True)
+        except Exception:
+            pass
         finally:
-            self._toggle_buttons(True)
+            # schedule next check
+            self.root.after(200, self._process_queue)
     
     def _toggle_buttons(self, enabled):
         """Enable or disable all buttons in the app"""
@@ -417,18 +519,43 @@ Interpretation:
         try:
             n_features = int(self.top_features_var.get())
             importances = self.predictor.feature_importance(top_n=n_features)
-            
+            # Text summary
             result = "FEATURE IMPORTANCE ANALYSIS\n" + "="*70 + "\n\nTop factors affecting draft position:\n\n"
-            
             for i, (feat, imp) in enumerate(importances.items(), 1):
-                bar_length = int(imp * 50)
-                bar = "█" * bar_length
-                result += f"{i:2}. {feat:<30} {bar} {imp:.4f}\n"
-            
+                result += f"{i:2}. {feat:<30} {imp:.4f}\n"
+
             self._display_results(self.analytics_results, result)
+
+            # Plot bar chart if available
+            if MATPLOTLIB_AVAILABLE and self.chart_ax is not None:
+                self._plot_feature_importance(importances)
+            elif not MATPLOTLIB_AVAILABLE:
+                # small hint if plotting not available
+                self.bottom_status_var.set("Matplotlib not available — install matplotlib to enable charts")
             
         except Exception as e:
             messagebox.showerror("Error", f"Analytics failed:\n{str(e)}")
+
+    def _plot_feature_importance(self, importances):
+        """Plot feature importances into the embedded Matplotlib axes."""
+        try:
+            feats = list(importances.keys())
+            imps = list(importances.values())
+            self.chart_ax.clear()
+            y_pos = range(len(feats))[::-1]
+            self.chart_ax.barh(y_pos, imps[::-1], align='center', color='#2a9df4')
+            self.chart_ax.set_yticks(y_pos)
+            self.chart_ax.set_yticklabels(feats[::-1])
+            self.chart_ax.set_xlabel('Importance')
+            self.chart_ax.set_title('Top Feature Importances')
+            self.chart_fig.tight_layout()
+            try:
+                self.chart_canvas.draw()
+            except Exception:
+                pass
+        except Exception:
+            # plotting should not crash the UI
+            pass
             
     def show_about(self):
         """Show about dialog"""
