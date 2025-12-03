@@ -7,7 +7,6 @@ ScoutSense UI - Tkinter-based GUI for NFL Draft Prediction and Player Comparison
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import pandas as pd
-import numpy as np
 from pathlib import Path
 import sys
 import os
@@ -176,12 +175,7 @@ Getting Started:
         frame = ttk.Frame(self.tab_predictor, padding="20")
         frame.pack(fill="both", expand=True)
         
-        # Title
-        ttk.Label(
-            frame,
-            text="Draft Position Predictor",
-            font=("Arial", 16, "bold")
-        ).pack(pady=10)
+        ttk.Label(frame, text="Draft Position Predictor", font=("Arial", 16, "bold")).pack(pady=10)
         
         # Player selection frame
         select_frame = ttk.LabelFrame(frame, text="Select Player", padding="10")
@@ -190,52 +184,23 @@ Getting Started:
         ttk.Label(select_frame, text="Player Name:").pack(side="left", padx=5)
         
         self.player_var = tk.StringVar()
-        self.player_combo = ttk.Combobox(
-            select_frame,
-            textvariable=self.player_var,
-            width=30,
-            state="normal"
-        )
+        self.player_combo = ttk.Combobox(select_frame, textvariable=self.player_var, width=30, state="normal")
         self.player_combo.pack(side="left", padx=5)
         
-        ttk.Button(
-            select_frame,
-            text="Predict",
-            command=self.predict_draft_position
-        ).pack(side="left", padx=5)
+        ttk.Button(select_frame, text="Predict", command=self.predict_draft_position).pack(side="left", padx=5)
         
         # Results frame
         results_frame = ttk.LabelFrame(frame, text="Prediction Results", padding="10")
         results_frame.pack(fill="both", expand=True, pady=10)
         
-        self.predictor_results = tk.Text(
-            results_frame,
-            height=20,
-            width=80,
-            state="disabled"
-        )
-        self.predictor_results.pack(fill="both", expand=True)
-        
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(
-            results_frame,
-            orient="vertical",
-            command=self.predictor_results.yview
-        )
-        scrollbar.pack(side="right", fill="y")
-        self.predictor_results.config(yscrollcommand=scrollbar.set)
+        self.predictor_results = self._create_results_text_widget(results_frame)
         
     def setup_comparison_tab(self):
         """Setup player comparison tab"""
         frame = ttk.Frame(self.tab_comparison, padding="20")
         frame.pack(fill="both", expand=True)
         
-        # Title
-        ttk.Label(
-            frame,
-            text="Player Comparison",
-            font=("Arial", 16, "bold")
-        ).pack(pady=10)
+        ttk.Label(frame, text="Player Comparison", font=("Arial", 16, "bold")).pack(pady=10)
         
         # Options frame
         options_frame = ttk.LabelFrame(frame, text="Comparison Options", padding="10")
@@ -244,64 +209,28 @@ Getting Started:
         ttk.Label(options_frame, text="Player Name:").pack(side="left", padx=5)
         
         self.compare_player_var = tk.StringVar()
-        self.compare_player_combo = ttk.Combobox(
-            options_frame,
-            textvariable=self.compare_player_var,
-            width=30,
-            state="normal"
-        )
+        self.compare_player_combo = ttk.Combobox(options_frame, textvariable=self.compare_player_var, width=30, state="normal")
         self.compare_player_combo.pack(side="left", padx=5)
         
         ttk.Label(options_frame, text="Similar Players:").pack(side="left", padx=5)
         
         self.similar_count_var = tk.StringVar(value="5")
-        similar_spinbox = ttk.Spinbox(
-            options_frame,
-            from_=1,
-            to=10,
-            textvariable=self.similar_count_var,
-            width=5
-        )
-        similar_spinbox.pack(side="left", padx=5)
+        ttk.Spinbox(options_frame, from_=1, to=10, textvariable=self.similar_count_var, width=5).pack(side="left", padx=5)
         
-        ttk.Button(
-            options_frame,
-            text="Compare",
-            command=self.find_similar_players
-        ).pack(side="left", padx=5)
+        ttk.Button(options_frame, text="Compare", command=self.find_similar_players).pack(side="left", padx=5)
         
         # Results frame
         results_frame = ttk.LabelFrame(frame, text="Comparison Results", padding="10")
         results_frame.pack(fill="both", expand=True, pady=10)
         
-        self.comparison_results = tk.Text(
-            results_frame,
-            height=20,
-            width=80,
-            state="disabled"
-        )
-        self.comparison_results.pack(fill="both", expand=True)
-        
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(
-            results_frame,
-            orient="vertical",
-            command=self.comparison_results.yview
-        )
-        scrollbar.pack(side="right", fill="y")
-        self.comparison_results.config(yscrollcommand=scrollbar.set)
+        self.comparison_results = self._create_results_text_widget(results_frame)
         
     def setup_analytics_tab(self):
         """Setup analytics tab"""
         frame = ttk.Frame(self.tab_analytics, padding="20")
         frame.pack(fill="both", expand=True)
         
-        # Title
-        ttk.Label(
-            frame,
-            text="Feature Importance & Analytics",
-            font=("Arial", 16, "bold")
-        ).pack(pady=10)
+        ttk.Label(frame, text="Feature Importance & Analytics", font=("Arial", 16, "bold")).pack(pady=10)
         
         # Options frame
         options_frame = ttk.LabelFrame(frame, text="Options", padding="10")
@@ -310,41 +239,15 @@ Getting Started:
         ttk.Label(options_frame, text="Top Features:").pack(side="left", padx=5)
         
         self.top_features_var = tk.StringVar(value="10")
-        features_spinbox = ttk.Spinbox(
-            options_frame,
-            from_=1,
-            to=20,
-            textvariable=self.top_features_var,
-            width=5
-        )
-        features_spinbox.pack(side="left", padx=5)
+        ttk.Spinbox(options_frame, from_=1, to=20, textvariable=self.top_features_var, width=5).pack(side="left", padx=5)
         
-        ttk.Button(
-            options_frame,
-            text="Analyze",
-            command=self.show_analytics
-        ).pack(side="left", padx=5)
+        ttk.Button(options_frame, text="Analyze", command=self.show_analytics).pack(side="left", padx=5)
         
         # Results frame
         results_frame = ttk.LabelFrame(frame, text="Analysis Results", padding="10")
         results_frame.pack(fill="both", expand=True, pady=10)
         
-        self.analytics_results = tk.Text(
-            results_frame,
-            height=20,
-            width=80,
-            state="disabled"
-        )
-        self.analytics_results.pack(fill="both", expand=True)
-        
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(
-            results_frame,
-            orient="vertical",
-            command=self.analytics_results.yview
-        )
-        scrollbar.pack(side="right", fill="y")
-        self.analytics_results.config(yscrollcommand=scrollbar.set)
+        self.analytics_results = self._create_results_text_widget(results_frame)
         
     def load_data(self):
         """Load data file"""
@@ -355,12 +258,7 @@ Getting Started:
         
         if file_path:
             try:
-                self.df = pd.read_csv(file_path)
-                self.status_label.config(
-                    text=f"Loaded: {Path(file_path).name} ({len(self.df)} rows)",
-                    foreground="green"
-                )
-                self.update_player_combos()
+                self._load_data_internal(file_path)
                 messagebox.showinfo("Success", f"Data loaded successfully!\nRows: {len(self.df)}")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load data:\n{str(e)}")
@@ -372,7 +270,10 @@ Getting Started:
         file_path = str(file_path)
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Data file not found: {file_path}")
-        # Use the same loading logic as the interactive loader
+        self._load_data_internal(file_path)
+    
+    def _load_data_internal(self, file_path):
+        """Internal method to load CSV data and update UI"""
         self.df = pd.read_csv(file_path)
         self.status_label.config(
             text=f"Loaded: {Path(file_path).name} ({len(self.df)} rows)",
@@ -387,11 +288,7 @@ Getting Started:
             return
             
         try:
-            # Disable buttons during training
-            for widget in self.root.winfo_children():
-                if isinstance(widget, ttk.Button):
-                    widget.config(state="disabled")
-            
+            self._toggle_buttons(False)
             self.root.update()
             
             # Train models
@@ -405,13 +302,17 @@ Getting Started:
             
             messagebox.showinfo("Success", "Models trained successfully!")
             
-            # Re-enable buttons
-            for widget in self.root.winfo_children():
-                if isinstance(widget, ttk.Button):
-                    widget.config(state="normal")
-                    
         except Exception as e:
             messagebox.showerror("Error", f"Training failed:\n{str(e)}")
+        finally:
+            self._toggle_buttons(True)
+    
+    def _toggle_buttons(self, enabled):
+        """Enable or disable all buttons in the app"""
+        state = "normal" if enabled else "disabled"
+        for widget in self.root.winfo_children():
+            if isinstance(widget, ttk.Button):
+                widget.config(state=state)
             
     def update_player_combos(self):
         """Update player combo boxes with available players"""
@@ -422,6 +323,24 @@ Getting Started:
             player_list = self.df['name'].tolist()
             self.player_combo['values'] = player_list
             self.compare_player_combo['values'] = player_list
+    
+    def _create_results_text_widget(self, parent):
+        """Create a text widget with scrollbar (reusable component)"""
+        text_widget = tk.Text(parent, height=20, width=80, state="disabled")
+        text_widget.pack(fill="both", expand=True)
+        
+        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=text_widget.yview)
+        scrollbar.pack(side="right", fill="y")
+        text_widget.config(yscrollcommand=scrollbar.set)
+        
+        return text_widget
+    
+    def _display_results(self, text_widget, content):
+        """Display content in a text widget"""
+        text_widget.config(state="normal")
+        text_widget.delete("1.0", tk.END)
+        text_widget.insert("1.0", content)
+        text_widget.config(state="disabled")
             
     def predict_draft_position(self):
         """Predict draft position for selected player"""
@@ -462,10 +381,7 @@ Interpretation:
 - Success is defined as being drafted in rounds 1-5
             """
             
-            self.predictor_results.config(state="normal")
-            self.predictor_results.delete("1.0", tk.END)
-            self.predictor_results.insert("1.0", result)
-            self.predictor_results.config(state="disabled")
+            self._display_results(self.predictor_results, result)
             
         except Exception as e:
             messagebox.showerror("Error", f"Prediction failed:\n{str(e)}")
@@ -483,22 +399,11 @@ Interpretation:
             
         try:
             n_similar = int(self.similar_count_var.get())
-            similar = self.comparator.find_similar_players(
-                player_name,
-                n_similar=n_similar,
-                position_only=True
-            )
+            similar = self.comparator.find_similar_players(player_name, n_similar=n_similar, position_only=True)
             
-            if similar.empty:
-                result = "No similar players found"
-            else:
-                result = "SIMILAR PLAYERS\n" + "="*70 + "\n\n"
-                result += similar[['name', 'pos', 'draft_pick', 'college', 'similarity_score']].to_string()
+            result = "No similar players found" if similar.empty else "SIMILAR PLAYERS\n" + "="*70 + "\n\n" + similar[['name', 'pos', 'draft_pick', 'college', 'similarity_score']].to_string()
             
-            self.comparison_results.config(state="normal")
-            self.comparison_results.delete("1.0", tk.END)
-            self.comparison_results.insert("1.0", result)
-            self.comparison_results.config(state="disabled")
+            self._display_results(self.comparison_results, result)
             
         except Exception as e:
             messagebox.showerror("Error", f"Comparison failed:\n{str(e)}")
@@ -513,19 +418,14 @@ Interpretation:
             n_features = int(self.top_features_var.get())
             importances = self.predictor.feature_importance(top_n=n_features)
             
-            result = "FEATURE IMPORTANCE ANALYSIS\n"
-            result += "="*70 + "\n\n"
-            result += "Top factors affecting draft position:\n\n"
+            result = "FEATURE IMPORTANCE ANALYSIS\n" + "="*70 + "\n\nTop factors affecting draft position:\n\n"
             
             for i, (feat, imp) in enumerate(importances.items(), 1):
                 bar_length = int(imp * 50)
                 bar = "█" * bar_length
                 result += f"{i:2}. {feat:<30} {bar} {imp:.4f}\n"
             
-            self.analytics_results.config(state="normal")
-            self.analytics_results.delete("1.0", tk.END)
-            self.analytics_results.insert("1.0", result)
-            self.analytics_results.config(state="disabled")
+            self._display_results(self.analytics_results, result)
             
         except Exception as e:
             messagebox.showerror("Error", f"Analytics failed:\n{str(e)}")
