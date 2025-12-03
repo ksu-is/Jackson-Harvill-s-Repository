@@ -194,7 +194,7 @@ Getting Started:
             select_frame,
             textvariable=self.player_var,
             width=30,
-            state="readonly"
+            state="normal"
         )
         self.player_combo.pack(side="left", padx=5)
         
@@ -248,7 +248,7 @@ Getting Started:
             options_frame,
             textvariable=self.compare_player_var,
             width=30,
-            state="readonly"
+            state="normal"
         )
         self.compare_player_combo.pack(side="left", padx=5)
         
@@ -567,14 +567,19 @@ def main():
             # Look for CSVs in the package data directory
             data_dir = Path(__file__).parent.parent / 'data'
             if data_dir.exists() and data_dir.is_dir():
-                # Prefer a file named 'default_data.csv' if present
-                default_file = data_dir / 'default_data.csv'
-                if default_file.exists():
-                    startup_data = str(default_file)
+                # Prefer 'nfl_draft_engineered.csv' if present
+                engineered_file = data_dir / 'nfl_draft_engineered.csv'
+                if engineered_file.exists():
+                    startup_data = str(engineered_file)
                 else:
-                    csvs = sorted(glob.glob(str(data_dir / '*.csv')))
-                    if csvs:
-                        startup_data = csvs[0]
+                    # Fall back to 'default_data.csv' if present
+                    default_file = data_dir / 'default_data.csv'
+                    if default_file.exists():
+                        startup_data = str(default_file)
+                    else:
+                        csvs = sorted(glob.glob(str(data_dir / '*.csv')))
+                        if csvs:
+                            startup_data = csvs[0]
 
     # Determine auto-train behavior: CLI -> ENV -> default True
     auto_train = True
